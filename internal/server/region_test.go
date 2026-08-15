@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -127,7 +126,7 @@ func regionTestLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-func blockedRegionServer(t *testing.T, imsi string) *Server {
+func regionTestServer(t *testing.T, imsi string) *Server {
 	t.Helper()
 	database, err := store.Open(context.Background(), ":memory:")
 	if err != nil {
@@ -147,47 +146,28 @@ func blockedRegionServer(t *testing.T, imsi string) *Server {
 	}
 }
 
-func TestModemSummaryRegionFields(t *testing.T) {
+func TestModemSummaryCardRegionFields(t *testing.T) {
 	t.Parallel()
-	blocked := modemSummary(&device.Snapshot{IMSI: "460001234567890"}, "", "")
-	if blocked["service_blocked"] != true {
-		t.Fatalf("service_blocked = %v, want true", blocked["service_blocked"])
-	}
-	if blocked["card_mcc"] != "460" || blocked["card_country"] != "中国" {
-		t.Fatalf("card_mcc=%v card_country=%v", blocked["card_mcc"], blocked["card_country"])
-	}
-	if reason, _ := blocked["blocked_reason"].(string); reason == "" {
-		t.Fatal("blocked_reason must be set for a blocked card")
-	}
-
-	allowed := modemSummary(&device.Snapshot{IMSI: "310260123456789"}, "", "")
-	if allowed["service_blocked"] != false || allowed["blocked_reason"] != "" {
-		t.Fatalf("allowed card summary = %v / %v", allowed["service_blocked"], allowed["blocked_reason"])
-	}
-	if allowed["card_mcc"] != "310" || allowed["card_country"] != "美国" {
-		t.Fatalf("allowed card_mcc=%v card_country=%v", allowed["card_mcc"], allowed["card_country"])
+	// The card's home region is reported for display only; nothing in the
+	// summary marks a card as barred from service.
+	for imsi, want := range map[string][2]string{
+		"460001234567890": {"460", "中国"},
+		"310260123456789": {"310", "美国"},
+	} {
+		summary := modemSummary(&device.Snapshot{IMSI: imsi}, "", "")
+		if summary["card_mcc"] != want[0] || summary["card_country"] != want[1] {
+			t.Fatalf("IMSI %s: card_mcc=%v card_country=%v, want %v", imsi, summary["card_mcc"], summary["card_country"], want)
+		}
+		for _, key := range []string{"service_blocked", "blocked_reason"} {
+			if _, present := summary[key]; present {
+				t.Fatalf("IMSI %s: summary still reports %q", imsi, key)
+			}
+		}
 	}
 
 	empty := modemSummary(nil, "", "")
-	if empty["service_blocked"] != false || empty["card_mcc"] != "" {
-		t.Fatalf("nil snapshot summary = %v / %v", empty["service_blocked"], empty["card_mcc"])
-	}
-}
-
-func TestWriteDeviceErrorMapsRegionBlockedTo403(t *testing.T) {
-	t.Parallel()
-	server := &Server{logger: regionTestLogger()}
-	recorder := httptest.NewRecorder()
-	server.writeDeviceError(recorder, device.ErrRegionBlocked)
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403", recorder.Code)
-	}
-	var envelope errorEnvelope
-	if err := json.NewDecoder(recorder.Body).Decode(&envelope); err != nil {
-		t.Fatal(err)
-	}
-	if envelope.Error.Code != "region_blocked" {
-		t.Fatalf("error code = %q, want region_blocked", envelope.Error.Code)
+	if empty["card_mcc"] != "" {
+		t.Fatalf("nil snapshot card_mcc = %v, want empty", empty["card_mcc"])
 	}
 }
 
@@ -209,44 +189,24 @@ func TestCountryNameForMCC(t *testing.T) {
 	}
 }
 
-func TestHandleVoWiFiEnabledBlockedRegion(t *testing.T) {
-	server := blockedRegionServer(t, "460001234567890")
-	request := httptest.NewRequest(http.MethodPatch, "/devices/dev1/vowifi", strings.NewReader(`{"enabled":true}`))
-	request.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
+// VoWiFi is available to every card region, including the MCCs that earlier
+// versions refused to serve.
+func TestHandleVoWiFiEnabledIsNotRegionGated(t *testing.T) {
+	for _, imsi := range []string{"460001234567890", "461001234567890", "310260123456789"} {
+		server := regionTestServer(t, imsi)
+		// Seed the device so the UpsertDevice that follows the guards succeeds.
+		if err := server.store.UpsertDevice(context.Background(), store.Device{ID: "dev1", Name: "EC20"}); err != nil {
+			t.Fatalf("seed device: %v", err)
+		}
+		request := httptest.NewRequest(http.MethodPatch, "/devices/dev1/vowifi", strings.NewReader(`{"enabled":true}`))
+		request.Header.Set("Content-Type", "application/json")
+		recorder := httptest.NewRecorder()
 
-	config := store.Device{ID: "dev1"}
-	if handled := server.handleVoWiFiEnabled(recorder, request, config, true); !handled {
-		t.Fatal("handler did not claim the request")
-	}
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403", recorder.Code)
-	}
-	var envelope errorEnvelope
-	if err := json.NewDecoder(recorder.Body).Decode(&envelope); err != nil {
-		t.Fatal(err)
-	}
-	if envelope.Error.Code != "region_blocked" {
-		t.Fatalf("error code = %q, want region_blocked", envelope.Error.Code)
-	}
-	// The block must happen before any state change is persisted.
-	if _, err := server.store.Device(context.Background(), "dev1"); !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("device config must not be written for a blocked region, err=%v", err)
-	}
-}
-
-func TestHandleVoWiFiEnabledAllowedRegionPassesGuard(t *testing.T) {
-	server := blockedRegionServer(t, "310260123456789")
-	// Seed the device so the post-guard UpsertDevice succeeds.
-	if err := server.store.UpsertDevice(context.Background(), store.Device{ID: "dev1", Name: "EC20"}); err != nil {
-		t.Fatalf("seed device: %v", err)
-	}
-	request := httptest.NewRequest(http.MethodPatch, "/devices/dev1/vowifi", strings.NewReader(`{"enabled":true}`))
-	request.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
-
-	server.handleVoWiFiEnabled(recorder, request, store.Device{ID: "dev1"}, true)
-	if recorder.Code == http.StatusForbidden {
-		t.Fatalf("allowed region must not be blocked, got 403: %s", recorder.Body.String())
+		if handled := server.handleVoWiFiEnabled(recorder, request, store.Device{ID: "dev1"}, true); !handled {
+			t.Fatalf("IMSI %s: handler did not claim the request", imsi)
+		}
+		if recorder.Code == http.StatusForbidden {
+			t.Fatalf("IMSI %s: must not be blocked, got 403: %s", imsi, recorder.Body.String())
+		}
 	}
 }

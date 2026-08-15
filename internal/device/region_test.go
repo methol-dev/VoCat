@@ -2,13 +2,11 @@ package device
 
 import (
 	"context"
-	"errors"
-	"strings"
 	"testing"
 )
 
-// injectSnapshot stores a snapshot on the managed device so region guards observe
-// its IMSI without replaying the full readSnapshot AT transcript.
+// injectSnapshot stores a snapshot on the managed device so callers observe its
+// IMSI without replaying the full readSnapshot AT transcript.
 func injectSnapshot(t *testing.T, manager *Manager, id string, snapshot *Snapshot) {
 	t.Helper()
 	state, err := manager.lookup(id)
@@ -33,87 +31,39 @@ func TestCardMCCMNC(t *testing.T) {
 	}
 }
 
-func TestRegionBlockReason(t *testing.T) {
-	t.Parallel()
-	for _, imsi := range []string{"460001234567890", "461001234567890"} {
-		reason := RegionBlockReason(imsi)
-		if reason == "" {
-			t.Fatalf("RegionBlockReason(%q) did not block", imsi)
-		}
-		if !strings.Contains(reason, "中国") {
-			t.Fatalf("RegionBlockReason(%q) = %q, want it to name 中国", imsi, reason)
-		}
-	}
-	for _, imsi := range []string{"310260123456789", "001011234567890", ""} {
-		if reason := RegionBlockReason(imsi); reason != "" {
-			t.Fatalf("RegionBlockReason(%q) = %q, want empty (fail-open)", imsi, reason)
-		}
-	}
-}
-
-func TestSetNetworkBlockedForRestrictedRegionSIM(t *testing.T) {
-	client := &transcriptClient{}
-	manager, id := newStartedTestManager(t, client)
-	injectSnapshot(t, manager, id, &Snapshot{DeviceID: id, IMSI: "460001234567890"})
-	_, err := manager.SetNetwork(context.Background(), id, NetworkRequest{
-		Enabled: true, APN: "internet", IPVersion: "IPV4V6",
-	})
-	if !errors.Is(err, ErrRegionBlocked) {
-		t.Fatalf("error = %v, want ErrRegionBlocked", err)
-	}
-	client.assertDone(t)
-}
-
-func TestSetNetworkAllowedForServedRegionSIM(t *testing.T) {
-	client := &transcriptClient{steps: []clientStep{
+func networkEnableTranscript() *transcriptClient {
+	return &transcriptClient{steps: []clientStep{
 		{command: `AT+CGDCONT=1,"IPV4V6","internet"`, response: okResponse()},
 		{command: "AT+CGATT=1", response: okResponse()},
 		{command: "AT+CGACT=1,1", response: okResponse()},
 	}}
-	manager, id := newStartedTestManager(t, client)
-	injectSnapshot(t, manager, id, &Snapshot{DeviceID: id, IMSI: "310260123456789"})
-	result, err := manager.SetNetwork(context.Background(), id, NetworkRequest{
-		Enabled: true, APN: "internet", IPVersion: "IPV4V6",
-	})
-	if err != nil {
-		t.Fatalf("enable network: %v", err)
-	}
-	if !result.Enabled {
-		t.Fatalf("enable result = %#v", result)
-	}
-	client.assertDone(t)
 }
 
-// A device whose SIM region is not yet known (no snapshot) must not be denied:
-// only a confirmed blocked MCC blocks service (fail-open).
-func TestSetNetworkAllowedWhenSIMRegionUnknown(t *testing.T) {
-	client := &transcriptClient{steps: []clientStep{
-		{command: `AT+CGDCONT=1,"IPV4V6","internet"`, response: okResponse()},
-		{command: "AT+CGATT=1", response: okResponse()},
-		{command: "AT+CGACT=1,1", response: okResponse()},
-	}}
-	manager, id := newStartedTestManager(t, client)
-	if _, err := manager.SetNetwork(context.Background(), id, NetworkRequest{
-		Enabled: true, APN: "internet", IPVersion: "IPV4V6",
-	}); err != nil {
-		t.Fatalf("enable network with unknown region: %v", err)
+// The card's home MCC no longer gates service: every region attaches, and so
+// does a card whose region is not known yet.
+func TestSetNetworkEnabledForCardRegion(t *testing.T) {
+	for name, imsi := range map[string]string{
+		"us":      "310260123456789",
+		"cn":      "460001234567890",
+		"cn_alt":  "461001234567890",
+		"unknown": "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			client := networkEnableTranscript()
+			manager, id := newStartedTestManager(t, client)
+			if imsi != "" {
+				injectSnapshot(t, manager, id, &Snapshot{DeviceID: id, IMSI: imsi})
+			}
+			result, err := manager.SetNetwork(context.Background(), id, NetworkRequest{
+				Enabled: true, APN: "internet", IPVersion: "IPV4V6",
+			})
+			if err != nil {
+				t.Fatalf("enable network: %v", err)
+			}
+			if !result.Enabled {
+				t.Fatalf("enable result = %#v", result)
+			}
+			client.assertDone(t)
+		})
 	}
-	client.assertDone(t)
-}
-
-func TestSendSMSBlockedForRestrictedRegionSIM(t *testing.T) {
-	client := &transcriptClient{}
-	manager, id := newStartedTestManager(t, client)
-	injectSnapshot(t, manager, id, &Snapshot{DeviceID: id, IMSI: "460001234567890"})
-	result, err := manager.SendSMS(context.Background(), id, "+15551234567", "hello")
-	if !errors.Is(err, ErrRegionBlocked) {
-		t.Fatalf("error = %v, want ErrRegionBlocked", err)
-	}
-	if result.PartsAttempted != 0 {
-		t.Fatalf("PartsAttempted = %d, want 0 for a blocked region", result.PartsAttempted)
-	}
-	if result.SubmissionStatus != "region_blocked" {
-		t.Fatalf("SubmissionStatus = %q, want region_blocked", result.SubmissionStatus)
-	}
-	client.assertDone(t)
 }

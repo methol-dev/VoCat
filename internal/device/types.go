@@ -20,7 +20,6 @@ var (
 	ErrSMSInvalidMessageIndex = errors.New("invalid SMS message index")
 	ErrDataBackendUnavailable = errors.New("cellular data backend is unavailable")
 	ErrInvalidNetworkAPN      = errors.New("invalid cellular APN")
-	ErrRegionBlocked          = errors.New("sim card home region is not served")
 	ErrUSSDSessionNotFound    = errors.New("ussd session not found or already closed")
 )
 
