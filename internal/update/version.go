@@ -7,16 +7,22 @@ import (
 )
 
 type semanticVersion struct {
-	major      int
-	minor      int
-	patch      int
+	major int
+	minor int
+	patch int
+	// revision is the optional fourth component of a MAJOR.MINOR.PATCH.REVISION
+	// release such as 0.1.14.1, used for a respin of an existing patch release.
+	// A three-component version has revision 0, which orders it before any
+	// revision of the same patch: 0.1.14 < 0.1.14.1 < 0.1.15.
+	revision   int
 	prerelease string
 }
 
 // IsNewerVersion reports whether latest is newer than current. Both values
-// may include the conventional v prefix, prerelease suffixes, and build
-// metadata. Invalid release versions are rejected instead of triggering a
-// downgrade or an arbitrary file replacement.
+// may include the conventional v prefix, an optional fourth revision
+// component, prerelease suffixes, and build metadata. Invalid release versions
+// are rejected instead of triggering a downgrade or an arbitrary file
+// replacement.
 func IsNewerVersion(current, latest string) (bool, error) {
 	currentVersion, err := parseSemanticVersion(current)
 	if err != nil {
@@ -34,6 +40,9 @@ func IsNewerVersion(current, latest string) (bool, error) {
 	}
 	if currentVersion.patch != latestVersion.patch {
 		return latestVersion.patch > currentVersion.patch, nil
+	}
+	if currentVersion.revision != latestVersion.revision {
+		return latestVersion.revision > currentVersion.revision, nil
 	}
 	if currentVersion.prerelease == latestVersion.prerelease {
 		return false, nil
@@ -60,10 +69,12 @@ func parseSemanticVersion(raw string) (semanticVersion, error) {
 		value = value[:dash]
 	}
 	parts := strings.Split(value, ".")
-	if len(parts) != 3 || (hasPrerelease && prerelease == "") {
+	// Three components is plain semver; a fourth is the optional revision of a
+	// respun patch release. Anything else is rejected.
+	if len(parts) < 3 || len(parts) > 4 || (hasPrerelease && prerelease == "") {
 		return semanticVersion{}, fmt.Errorf("%q is not a semantic version", raw)
 	}
-	numbers := make([]int, 3)
+	numbers := make([]int, 4)
 	for index, part := range parts {
 		if part == "" || (len(part) > 1 && part[0] == '0') {
 			return semanticVersion{}, fmt.Errorf("%q is not a semantic version", raw)
@@ -74,6 +85,11 @@ func parseSemanticVersion(raw string) (semanticVersion, error) {
 		}
 		numbers[index] = value
 	}
+	// A ".0" revision is the same release as the three-component form, so it is
+	// rejected rather than silently accepted as a second spelling of it.
+	if len(parts) == 4 && numbers[3] == 0 {
+		return semanticVersion{}, fmt.Errorf("%q is not a semantic version", raw)
+	}
 	if strings.ContainsAny(prerelease, " \t\r\n") {
 		return semanticVersion{}, fmt.Errorf("%q is not a semantic version", raw)
 	}
@@ -81,6 +97,7 @@ func parseSemanticVersion(raw string) (semanticVersion, error) {
 		major:      numbers[0],
 		minor:      numbers[1],
 		patch:      numbers[2],
+		revision:   numbers[3],
 		prerelease: prerelease,
 	}, nil
 }

@@ -140,34 +140,6 @@ func TestSMSSendOutcome(t *testing.T) {
 	}
 }
 
-func TestBlockedSMSDestination(t *testing.T) {
-	tests := []struct {
-		name  string
-		phone string
-		block bool
-	}{
-		{"e164 china", "+8613800138000", true},
-		{"no plus china", "8613800138000", true},
-		{"international prefix china", "008613800138000", true},
-		{"spaced china", "+86 138 0013 8000", true},
-		{"dashed china", "+86-138-0013-8000", true},
-		{"us e164", "+12025550177", false},
-		{"us no plus", "12025550177", false},
-		{"uk e164", "+447700900123", false},
-		{"italy", "+393331234567", false},
-		{"russia", "+79161234567", false},
-		{"japan", "+819012345678", false},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			blocked, _ := blockedSMSDestination(test.phone)
-			if blocked != test.block {
-				t.Fatalf("blockedSMSDestination(%q) blocked = %v, want %v", test.phone, blocked, test.block)
-			}
-		})
-	}
-}
-
 func TestHandleSMSSendEnforcesGlobalHourlyLimit(t *testing.T) {
 	ctx := context.Background()
 	database, err := store.Open(ctx, ":memory:")

@@ -77,12 +77,6 @@ func (manager *Manager) SetNetwork(
 	if err := manager.validateActive(id, state); err != nil {
 		return NetworkResult{}, err
 	}
-	if request.Enabled {
-		if err := manager.regionBlockError(state); err != nil {
-			manager.setResult(id, state, nil, err)
-			return NetworkResult{}, err
-		}
-	}
 	candidate := manager.candidateFor(state)
 	backend := strings.ToLower(strings.TrimSpace(request.Backend))
 	if backend == "" {

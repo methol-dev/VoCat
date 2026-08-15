@@ -321,4 +321,4 @@ cd web && npm run build
 
 ## 许可证
 
-参见 [LICENSE](../LICENSE)。
+本项目以 MIT 许可证发布。参见 [LICENSE](../LICENSE)。

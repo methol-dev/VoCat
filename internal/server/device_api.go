@@ -830,15 +830,6 @@ func (s *Server) handleVoWiFiEnabled(
 		writeError(w, http.StatusConflict, "cellular_data_active", "disable roaming data before enabling VoWiFi")
 		return true
 	}
-	if request.Enabled {
-		entry, _, _ := s.physicalForConfig(config)
-		imsi := snapshotString(entry.Snapshot, func(snapshot *device.Snapshot) string { return snapshot.IMSI })
-		if reason := device.RegionBlockReason(imsi); reason != "" {
-			writeError(w, http.StatusForbidden, "region_blocked", reason)
-			return true
-		}
-	}
-
 	// Establish RF-off synchronously before changing the asynchronous VoWiFi
 	// lifecycle. This removes the attach window both when entering VoWiFi and
 	// when leaving it: teardown starts from CFUN=4 and is required to remain
@@ -1388,8 +1379,6 @@ func (s *Server) writeDeviceError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "esim_cat_busy", "The eUICC is busy with a SIM Toolkit operation. Wait a moment and retry disabling the profile.")
 	case errors.Is(err, device.ErrInvalidNetworkAPN):
 		writeError(w, http.StatusBadRequest, "invalid_apn", "APN must contain only letters, digits, dots, underscores, or hyphens")
-	case errors.Is(err, device.ErrRegionBlocked):
-		writeError(w, http.StatusForbidden, "region_blocked", err.Error())
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, modem.ErrCommandTimeout):
 		writeError(w, http.StatusGatewayTimeout, "modem_timeout", "the modem did not answer before the command timeout")
 	case errors.Is(err, context.Canceled):
@@ -1915,8 +1904,6 @@ func modemSummary(snapshot *device.Snapshot, phone string, phoneSource string) m
 			"home_carrier_name":         "",
 			"home_carrier_plmn":         "",
 			"home_carrier_country_code": "",
-			"service_blocked":           false,
-			"blocked_reason":            "",
 			"network_mode":              "",
 			"radio_band":                "",
 			"radio_channel":             0,
@@ -1939,7 +1926,6 @@ func modemSummary(snapshot *device.Snapshot, phone string, phoneSource string) m
 		IMSI: snapshot.IMSI, ICCID: snapshot.ICCID, SPN: snapshot.SPN,
 		GID1: snapshot.GID1, GID2: snapshot.GID2, MNCLength: snapshot.MNCLength,
 	})
-	blockedReason := device.RegionBlockReason(snapshot.IMSI)
 	return map[string]any{
 		"operator":                  snapshot.OperatorName,
 		"native_mcc":                mcc,
@@ -1952,8 +1938,6 @@ func modemSummary(snapshot *device.Snapshot, phone string, phoneSource string) m
 		"home_carrier_name":         homeCarrier,
 		"home_carrier_plmn":         homePLMN,
 		"home_carrier_country_code": homeCountry,
-		"service_blocked":           blockedReason != "",
-		"blocked_reason":            blockedReason,
 		"network_mode":              snapshot.AccessTech,
 		"network_duplex":            "",
 		"radio_band":                snapshot.Band,

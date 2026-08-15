@@ -33,35 +33,25 @@ function ZhItems() {
   return (
     <>
       <Item index={1}>
-        本软件（vocat）为 source-available（源码可见）软件，依据 Vocat Research & Evaluation License 分发，
-        <strong className="text-indigo-600 dark:text-indigo-400">并非 OSI 认证的开源许可</strong>
-        。仅授权用于研究、教育、开发及高通蜂窝模组硬件功能验证；获取源码并不自动授予商用、再发布不受限修改版本或移除防滥用控制的权利。
+        本软件（vocat）为
+        <strong className="text-indigo-600 dark:text-indigo-400">依据 MIT 许可证发布的开源软件</strong>
+        。你可以自由地使用、复制、修改、合并、发布、分发、再许可及销售本软件的副本，包括用于商业用途，
+        唯须在所有副本或实质性部分中保留版权声明与许可声明。
       </Item>
       <Item index={2}>
         本项目用于对自研 / 定制高通模组（首发 Quectel EC20）进行功能验证与故障诊断。仅应使用测试卡、开发卡、实验室卡、授权 eSIM profile，或本人拥有 / 被明确授权测试的 SIM/eSIM 资源；
         <strong className="text-indigo-600 dark:text-indigo-400">不得使用属于他人的生产用订户凭证</strong>。
       </Item>
       <Item index={3}>
-        对 MCC 460 / 461（中国大陆）SIM 卡，系统将<strong className="text-red-500 dark:text-red-400">自动强制飞行模式并写入卡策略</strong>
-        ；向 +86 号段发送短信会被服务端拦截。上述为代码层强制控制，严禁移除、绕过、禁用、伪装或破坏。
+        <strong className="text-red-500 dark:text-red-400">禁止用途：</strong>
+        未授权接入电信网络、冒用他人订户或设备、SIM 克隆、未授权 eSIM 开通、使用被盗 / 泄露凭证、电信欺诈、大规模群发短信、绕过运营商鉴权或合法限制、未授权拦截 / 监听，以及干扰移动网络基础设施。
       </Item>
       <Item index={4}>
-        <strong className="text-red-500 dark:text-red-400">禁止用途：</strong>
-        未授权接入电信网络、冒用他人订户或设备、SIM 克隆、未授权 eSIM 开通、使用被盗 / 泄露凭证、电信欺诈、大规模群发短信、绕过运营商鉴权或合法限制、未授权拦截 / 监听、干扰移动网络基础设施，以及商业电信服务。
-      </Item>
-      <Item index={5}>
-        未经书面授权不得商用。修改或再发布版本
-        <strong className="text-red-500 dark:text-red-400">
-          不得以移除或绕过地域限制、SIM / MCC 限制、设备数量限制、鉴权机制、完整性校验或防滥用控制为主要目的
-        </strong>
-        ，并须保留版权、许可与署名声明。
-      </Item>
-      <Item index={6}>
         软件按 “AS IS” 提供，不附带任何明示或暗示的担保。作者、维护者、贡献者与分发者不对使用或滥用造成的损失负责，包括 SIM 卡损坏、eSIM profile 丢失、SIM 停用、modem / 基带故障、PCB / 模组 / 宿主设备损坏、网络服务中断、运营商 / 账户限制、数据丢失、监管后果及未授权的电信活动；
         <strong>使用者有责任确保其使用符合适用法律、运营商政策与合同义务</strong>。
       </Item>
-      <Item index={7}>
-        点击继续即表示你承诺：你的使用是授权的，并符合适用许可、法律、电信法规、运营商政策与测试要求。若拒绝，本软件将被卸载并清理运行环境。
+      <Item index={5}>
+        点击继续即表示你承诺：你的使用是授权的，并符合适用法律、电信法规、运营商政策与测试要求。若拒绝，本软件将被卸载并清理运行环境。
       </Item>
     </>
   );
@@ -72,14 +62,13 @@ function EnItems() {
   return (
     <>
       <Item index={1}>
-        This software (vocat) is source-available software distributed under the Vocat Research &amp; Evaluation License
-        and{" "}
+        This software (vocat) is{" "}
         <strong className="text-indigo-600 dark:text-indigo-400">
-          is not an OSI-approved open-source license
+          open-source software released under the MIT License
         </strong>
-        . It is authorized only for research, education, development, and hardware function verification of Qualcomm
-        cellular modules; access to source code does not automatically grant the right to commercial use, redistribute
-        unrestricted modified versions, or remove anti-abuse controls.
+        . You are free to use, copy, modify, merge, publish, distribute, sublicense, and sell copies of it, including
+        for commercial purposes, provided the copyright notice and license notice are retained in all copies or
+        substantial portions of the Software.
       </Item>
       <Item index={2}>
         This project is for function verification and fault diagnosis of custom Qualcomm modules (primarily Quectel
@@ -91,39 +80,23 @@ function EnItems() {
         .
       </Item>
       <Item index={3}>
-        For MCC 460 / 461 (Chinese mainland) SIM cards, the system will{" "}
-        <strong className="text-red-500 dark:text-red-400">
-          automatically force airplane mode and write a card policy
-        </strong>
-        ; SMS to +86 numbers is blocked by the server. These are code-enforced controls and must not be removed,
-        bypassed, disabled, disguised, or tampered with.
-      </Item>
-      <Item index={4}>
         <strong className="text-red-500 dark:text-red-400">Prohibited uses:</strong>{" "}
         unauthorized network access, impersonating another subscriber or device, SIM cloning, unauthorized eSIM
         provisioning, use of stolen or leaked credentials, telecom fraud, mass SMS sending, bypassing operator
-        authentication or lawful restrictions, unauthorized interception, disrupting mobile network infrastructure,
-        and commercial telecom services.
+        authentication or lawful restrictions, unauthorized interception, and disrupting mobile network
+        infrastructure.
       </Item>
-      <Item index={5}>
-        Commercial use is not permitted without written authorization. Modified or redistributed versions{" "}
-        <strong className="text-red-500 dark:text-red-400">
-          must not have removing or bypassing regional, SIM, MCC, device-count, authentication, integrity, or
-          anti-abuse controls as their primary purpose
-        </strong>
-        , and must retain copyright, license, and attribution notices.
-      </Item>
-      <Item index={6}>
+      <Item index={4}>
         The software is provided &ldquo;AS IS&rdquo; without any express or implied warranty. The authors, maintainers,
         contributors, and distributors are not liable for losses from use or misuse, including SIM damage, eSIM profile
         loss, SIM deactivation, modem/baseband failure, PCB/module/host device damage, network service interruption,
         operator/account restrictions, data loss, regulatory consequences, and unauthorized telecom activity;{" "}
         <strong>the user is responsible for ensuring their use complies with applicable laws, operator policies, and contractual obligations</strong>.
       </Item>
-      <Item index={7}>
-        Clicking continue signifies that you agree to ensure your use is authorized and complies with the applicable
-        license, laws, telecom regulations, operator policies, and testing requirements. If you decline, the software
-        will be uninstalled and its environment cleaned up.
+      <Item index={5}>
+        Clicking continue signifies that you agree to ensure your use is authorized and complies with applicable laws,
+        telecom regulations, operator policies, and testing requirements. If you decline, the software will be
+        uninstalled and its environment cleaned up.
       </Item>
     </>
   );
